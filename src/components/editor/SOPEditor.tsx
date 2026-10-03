@@ -1,8 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import TextAlign from '@tiptap/extension-text-align';
 import { 
   Bold, Italic, Underline as UnderlineIcon, 
   Heading1, Heading2, Heading3, 

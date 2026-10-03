@@ -97,9 +97,12 @@ describe('SOPStudio Canonical Document Model & Operations', () => {
   });
 
   describe('2. Structured Content Representation & Shared Tiptap Schema', () => {
-    it('authoritative sharedEditorExtensions are exported and configured', () => {
+    it('authoritative sharedEditorExtensions explicitly includes Underline extension', () => {
       expect(Array.isArray(sharedEditorExtensions)).toBe(true);
       expect(sharedEditorExtensions.length).toBeGreaterThan(0);
+      const underlineExt = sharedEditorExtensions.find(ext => ext.name === 'underline');
+      expect(underlineExt).toBeDefined();
+      expect(underlineExt?.name).toBe('underline');
     });
 
     it('converts content containing an underline mark to HTML successfully without losing the mark', () => {
