@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { createBlankDocument } from '../src/templates/defaultDocument';
 import { TEMPLATE_STYLES, TEMPLATE_STYLE_LIST } from '../src/templates/styles';
 import { SAMPLE_LAB_SOP } from '../src/data/sampleSop';
@@ -18,10 +20,18 @@ import {
   updateDocumentSectionContent 
 } from '../src/operations/documentOperations';
 import { extractPlainText, contentToHTML, createContentFromParagraphs } from '../src/models/content';
-import { SOPSection } from '../src/types/document';
+import { sharedEditorExtensions } from '../src/editor/extensions';
+import { SOPSection, JSONContent } from '../src/types/document';
+import { DocumentProvider, useSOP } from '../src/state/documentContext';
+import { 
+  HistoryState,
+  pushHistoryMilestone, 
+  performUndoStep, 
+  performRedoStep 
+} from '../src/state/historyManager';
 
 describe('SOPStudio Canonical Document Model & Operations', () => {
-  describe('Document Model & Initialization', () => {
+  describe('1. Document Model & Initialization', () => {
     it('creates a new blank SOP document with 16 standardized sections', () => {
       const doc = createBlankDocument({
         title: 'Analytical Balance Calibration Protocol',
@@ -86,47 +96,138 @@ describe('SOPStudio Canonical Document Model & Operations', () => {
     });
   });
 
-  describe('Structured Content Representation (ProseMirror JSONContent)', () => {
-    it('section content stores structured editor JSON, not raw HTML', () => {
-      const doc = SAMPLE_LAB_SOP;
-      const procedureSection = doc.sections.find(s => s.number === '9.0');
-
-      expect(procedureSection).toBeDefined();
-      // Canonical content MUST be a structured ProseMirror node object
-      expect(typeof procedureSection?.content).toBe('object');
-      expect(procedureSection?.content.type).toBe('doc');
-      expect(Array.isArray(procedureSection?.content.content)).toBe(true);
-
-      // Verify that plain text can be extracted from structured content
-      const plainText = extractPlainText(procedureSection?.content);
-      expect(plainText).toContain('Three-Point Calibration Protocol');
-
-      // Verify that HTML is derived for preview/export only
-      const derivedHTML = contentToHTML(procedureSection?.content);
-      expect(typeof derivedHTML).toBe('string');
-      expect(derivedHTML).toContain('Three-Point Calibration Protocol');
+  describe('2. Structured Content Representation & Shared Tiptap Schema', () => {
+    it('authoritative sharedEditorExtensions are exported and configured', () => {
+      expect(Array.isArray(sharedEditorExtensions)).toBe(true);
+      expect(sharedEditorExtensions.length).toBeGreaterThan(0);
     });
 
-    it('serializes and deserializes structured content to/from JSON without data loss', () => {
-      const sampleDoc = SAMPLE_LAB_SOP;
-      const jsonString = documentStorage.exportToJSONString(sampleDoc);
-      expect(typeof jsonString).toBe('string');
+    it('converts content containing an underline mark to HTML successfully without losing the mark', () => {
+      const underlinedDoc: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Critical calibration threshold: ',
+              },
+              {
+                type: 'text',
+                text: 'do not exceed 50.0 degrees Celsius',
+                marks: [{ type: 'underline' }]
+              }
+            ]
+          }
+        ]
+      };
 
-      const restoredDoc = documentStorage.importFromJSONString(jsonString);
-      expect(restoredDoc.id).toBe(sampleDoc.id);
-      expect(restoredDoc.metadata.title).toBe(sampleDoc.metadata.title);
-      expect(restoredDoc.metadata.sopNumber).toBe(sampleDoc.metadata.sopNumber);
-      expect(restoredDoc.sections).toHaveLength(16);
+      const html = contentToHTML(underlinedDoc);
+      expect(html).toContain('<u>do not exceed 50.0 degrees Celsius</u>');
+      expect(html).toContain('Critical calibration threshold:');
+    });
 
-      // Inspect restored structured content node
-      const restoredProcedure = restoredDoc.sections.find(s => s.number === '9.0');
-      expect(restoredProcedure?.content.type).toBe('doc');
-      const text = extractPlainText(restoredProcedure?.content);
-      expect(text).toContain('Three-Point Calibration Protocol');
+    it('preserves rich document structure through complete JSONContent serialization and deserialization', () => {
+      const richContent: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Section Heading Level 2' }]
+          },
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Normal text with ' },
+              { type: 'text', text: 'bold statement', marks: [{ type: 'bold' }] },
+              { type: 'text', text: ', ' },
+              { type: 'text', text: 'italic note', marks: [{ type: 'italic' }] },
+              { type: 'text', text: ', and ' },
+              { type: 'text', text: 'underlined mandate', marks: [{ type: 'underline' }] },
+              { type: 'text', text: '.' }
+            ]
+          },
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First bullet point' }] }]
+              },
+              {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Second bullet point' }] }]
+              }
+            ]
+          },
+          {
+            type: 'orderedList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Step 1 sequence' }] }]
+              },
+              {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Step 2 sequence' }] }]
+              }
+            ]
+          }
+        ]
+      };
+
+      const testDoc = createBlankDocument({ title: 'Rich Schema Test' });
+      testDoc.sections[8].content = richContent;
+
+      // Serialization
+      const serialized = documentStorage.exportToJSONString(testDoc);
+      expect(typeof serialized).toBe('string');
+
+      // Deserialization
+      const restored = documentStorage.importFromJSONString(serialized);
+      const restoredSectionContent = restored.sections[8].content;
+
+      // Verify node types and exact AST hierarchy
+      expect(restoredSectionContent.type).toBe('doc');
+      expect(restoredSectionContent.content).toHaveLength(4);
+
+      // Verify Heading
+      const headingNode = restoredSectionContent.content![0];
+      expect(headingNode.type).toBe('heading');
+      expect(headingNode.attrs?.level).toBe(2);
+      expect(headingNode.content![0].text).toBe('Section Heading Level 2');
+
+      // Verify Paragraph with Bold, Italic, and Underline marks
+      const paragraphNode = restoredSectionContent.content![1];
+      expect(paragraphNode.type).toBe('paragraph');
+      expect(paragraphNode.content![1].marks).toEqual([{ type: 'bold' }]);
+      expect(paragraphNode.content![3].marks).toEqual([{ type: 'italic' }]);
+      expect(paragraphNode.content![5].marks).toEqual([{ type: 'underline' }]);
+
+      // Verify Bullet List
+      const bulletListNode = restoredSectionContent.content![2];
+      expect(bulletListNode.type).toBe('bulletList');
+      expect(bulletListNode.content).toHaveLength(2);
+
+      // Verify Ordered List
+      const orderedListNode = restoredSectionContent.content![3];
+      expect(orderedListNode.type).toBe('orderedList');
+      expect(orderedListNode.content).toHaveLength(2);
+
+      // Verify derived HTML reflects all formatting
+      const derivedHTML = contentToHTML(restoredSectionContent);
+      expect(derivedHTML).toContain('<h2>Section Heading Level 2</h2>');
+      expect(derivedHTML).toContain('<strong>bold statement</strong>');
+      expect(derivedHTML).toContain('<em>italic note</em>');
+      expect(derivedHTML).toContain('<u>underlined mandate</u>');
+      expect(derivedHTML).toContain('<ul>');
+      expect(derivedHTML).toContain('<ol>');
     });
   });
 
-  describe('Section Operations & Nested Section Support', () => {
+  describe('3. Recursive Section Operations & Preservation of Unrelated Nodes', () => {
     const sampleTree: SOPSection[] = [
       {
         id: 'sec-1',
@@ -169,44 +270,44 @@ describe('SOPStudio Canonical Document Model & Operations', () => {
       }
     ];
 
-    it('finds top-level sections by ID', () => {
-      const found = findSection(sampleTree, 'sec-1');
-      expect(found).toBeDefined();
-      expect(found?.title).toBe('Top Section 1');
+    it('finds top-level and nested sections recursively', () => {
+      expect(findSection(sampleTree, 'sec-1')?.title).toBe('Top Section 1');
+      expect(findSection(sampleTree, 'sec-2-1')?.title).toBe('Nested Subsection 2.1');
+      expect(findSection(sampleTree, 'sec-2-2-1')?.title).toBe('Deeply Nested Subsection 2.2.1');
+      expect(findSection(sampleTree, 'invalid-id')).toBeNull();
     });
 
-    it('finds nested sections recursively', () => {
-      const child = findSection(sampleTree, 'sec-2-1');
-      expect(child).toBeDefined();
-      expect(child?.title).toBe('Nested Subsection 2.1');
+    it('updating a nested section preserves unrelated top-level and sibling sections', () => {
+      const newNestedContent = createContentFromParagraphs('Modified text in 2.2.1');
+      const updatedTree = updateSectionContent(sampleTree, 'sec-2-2-1', newNestedContent);
 
-      const deepChild = findSection(sampleTree, 'sec-2-2-1');
-      expect(deepChild).toBeDefined();
-      expect(deepChild?.title).toBe('Deeply Nested Subsection 2.2.1');
+      // Target section is updated
+      const updatedNested = findSection(updatedTree, 'sec-2-2-1');
+      expect(extractPlainText(updatedNested?.content)).toBe('Modified text in 2.2.1');
+
+      // Unrelated top-level section (sec-1) is strictly identical
+      const untouchedTopLevel = findSection(updatedTree, 'sec-1');
+      expect(untouchedTopLevel).toBe(sampleTree[0]); // Reference identity preserved
+      expect(extractPlainText(untouchedTopLevel?.content)).toBe('Top level 1 content');
+
+      // Sibling subsection (sec-2-1) is strictly preserved
+      const untouchedSibling = findSection(updatedTree, 'sec-2-1');
+      const originalSibling = findSection(sampleTree, 'sec-2-1');
+      expect(untouchedSibling).toBe(originalSibling); // Reference identity preserved
+      expect(extractPlainText(untouchedSibling?.content)).toBe('Nested child content 2.1');
+
+      // Original sampleTree is completely unmodified (immutable)
+      const originalNested = findSection(sampleTree, 'sec-2-2-1');
+      expect(extractPlainText(originalNested?.content)).toBe('Deeply nested 3rd level content');
     });
 
-    it('returns null when section ID does not exist', () => {
-      const missing = findSection(sampleTree, 'non-existent-id');
-      expect(missing).toBeNull();
-    });
-
-    it('updates top-level section title immutably', () => {
-      const updated = updateSectionTitle(sampleTree, 'sec-1', 'Renamed Top Section');
-      expect(findSection(updated, 'sec-1')?.title).toBe('Renamed Top Section');
-      expect(findSection(sampleTree, 'sec-1')?.title).toBe('Top Section 1'); // original untouched
-    });
-
-    it('updates nested section title and content recursively', () => {
-      const newContent = createContentFromParagraphs('Updated nested instructions');
-      const updated = updateSectionContent(sampleTree, 'sec-2-2-1', newContent);
-      
-      const updatedNode = findSection(updated, 'sec-2-2-1');
-      expect(updatedNode).toBeDefined();
-      expect(extractPlainText(updatedNode?.content)).toBe('Updated nested instructions');
-
-      // Original tree remains unchanged
-      const originalNode = findSection(sampleTree, 'sec-2-2-1');
-      expect(extractPlainText(originalNode?.content)).toBe('Deeply nested 3rd level content');
+    it('updating section title recursively preserves other attributes and nodes', () => {
+      const updatedTree = updateSectionTitle(sampleTree, 'sec-2-1', 'Calibrated Sub-Protocol 2.1');
+      const node = findSection(updatedTree, 'sec-2-1');
+      expect(node?.title).toBe('Calibrated Sub-Protocol 2.1');
+      expect(node?.number).toBe('2.1');
+      expect(node?.isMandatory).toBe(false);
+      expect(extractPlainText(node?.content)).toBe('Nested child content 2.1');
     });
 
     it('counts and flattens sections accurately across hierarchy levels', () => {
@@ -217,16 +318,79 @@ describe('SOPStudio Canonical Document Model & Operations', () => {
     });
   });
 
-  describe('Application UI State & Home Entry Point', () => {
-    it('initializes application state with Home as primary entry point', () => {
-      // In DocumentProvider state architecture, currentScreen starts at 'home'
-      // to ensure a fresh launch opens on Home, not inside workspace
-      const defaultBlank = createBlankDocument();
-      expect(defaultBlank).toBeDefined();
+  describe('4. Application UI State & Home Entry Point', () => {
+    it('verifies DocumentProvider initializes with currentScreen = "home"', () => {
+      // Test consumer reading context value directly from DocumentProvider
+      function ScreenTestConsumer() {
+        const { currentScreen } = useSOP();
+        return React.createElement('div', { id: 'test-screen-indicator' }, currentScreen);
+      }
+
+      const renderedMarkup = renderToString(
+        React.createElement(DocumentProvider, null, React.createElement(ScreenTestConsumer, null))
+      );
+
+      // Verify the rendered indicator contains 'home' as initial state
+      expect(renderedMarkup).toContain('id="test-screen-indicator"');
+      expect(renderedMarkup).toContain('home');
     });
   });
 
-  describe('Validation Engine', () => {
+  describe('5. Undo/Redo History Manager Logic', () => {
+    it('captures milestones on discrete updates and supports bidirectional undo/redo', () => {
+      const docA = createBlankDocument({ title: 'Revision A' });
+      const docB = createBlankDocument({ title: 'Revision B' });
+      const docC = createBlankDocument({ title: 'Revision C' });
+
+      let history: HistoryState = { undoStack: [], redoStack: [] };
+
+      // Push milestone from docA to docB
+      history = pushHistoryMilestone(history, docA);
+      expect(history.undoStack).toHaveLength(1);
+      expect(history.redoStack).toHaveLength(0);
+
+      // Push milestone from docB to docC
+      history = pushHistoryMilestone(history, docB);
+      expect(history.undoStack).toHaveLength(2);
+
+      // Undo step: returns previous doc (docB) and moves docC to redoStack
+      const undoResult1 = performUndoStep(history, docC);
+      expect(undoResult1).not.toBeNull();
+      expect(undoResult1?.nextDoc.metadata.title).toBe('Revision B');
+      expect(undoResult1?.state.undoStack).toHaveLength(1);
+      expect(undoResult1?.state.redoStack).toHaveLength(1);
+
+      // Undo step 2: returns docA and moves docB to redoStack
+      const undoResult2 = performUndoStep(undoResult1!.state, undoResult1!.nextDoc);
+      expect(undoResult2).not.toBeNull();
+      expect(undoResult2?.nextDoc.metadata.title).toBe('Revision A');
+      expect(undoResult2?.state.undoStack).toHaveLength(0);
+      expect(undoResult2?.state.redoStack).toHaveLength(2);
+
+      // Redo step: restores docB
+      const redoResult = performRedoStep(undoResult2!.state, undoResult2!.nextDoc);
+      expect(redoResult).not.toBeNull();
+      expect(redoResult?.nextDoc.metadata.title).toBe('Revision B');
+      expect(redoResult?.state.undoStack).toHaveLength(1);
+      expect(redoResult?.state.redoStack).toHaveLength(1);
+    });
+
+    it('clears redo stack when a new milestone is pushed', () => {
+      const docA = createBlankDocument({ title: 'A' });
+      const docB = createBlankDocument({ title: 'B' });
+      const docC = createBlankDocument({ title: 'C' });
+
+      const history: HistoryState = pushHistoryMilestone({ undoStack: [], redoStack: [] }, docA);
+      const undoResult = performUndoStep(history, docB);
+      expect(undoResult?.state.redoStack).toHaveLength(1);
+
+      // User performs a new discrete action instead of redoing
+      const branchedHistory = pushHistoryMilestone(undoResult!.state, docC);
+      expect(branchedHistory.redoStack).toHaveLength(0); // cleared on branch
+    });
+  });
+
+  describe('6. Validation Engine', () => {
     it('validates complete document and reports high completion percentage', () => {
       const result = validationEngine.validate(SAMPLE_LAB_SOP);
       expect(result.isValid).toBe(true);

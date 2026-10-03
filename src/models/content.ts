@@ -1,18 +1,6 @@
 import { JSONContent } from '../types/document';
 import { generateHTML } from '@tiptap/html';
-import StarterKit from '@tiptap/starter-kit';
-import TextAlign from '@tiptap/extension-text-align';
-
-const extensions = [
-  StarterKit.configure({
-    heading: {
-      levels: [1, 2, 3]
-    }
-  }),
-  TextAlign.configure({
-    types: ['heading', 'paragraph']
-  })
-];
+import { sharedEditorExtensions } from '../editor/extensions';
 
 /**
  * Creates an empty canonical ProseMirror document representation.
@@ -55,7 +43,7 @@ export function contentToHTML(content: JSONContent | undefined | null): string {
   }
 
   try {
-    return generateHTML(content, extensions);
+    return generateHTML(content, sharedEditorExtensions);
   } catch (err) {
     console.warn('Failed to generate HTML from JSONContent, using fallback:', err);
     // Fallback text extraction if schema mismatch

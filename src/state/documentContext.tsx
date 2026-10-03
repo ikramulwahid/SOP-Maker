@@ -20,6 +20,12 @@ import {
   updateDocumentSectionContent, 
   toggleDocumentSectionCollapse 
 } from '../operations/documentOperations';
+import { 
+  HistoryState, 
+  pushHistoryMilestone, 
+  performUndoStep, 
+  performRedoStep 
+} from './historyManager';
 
 export type ViewMode = 'editor' | 'preview' | 'split';
 export type AppScreen = 'home' | 'workspace' | 'new-wizard';
@@ -95,7 +101,10 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (typingBaselineDoc.current && !isUndoRedoAction.current) {
       const snapshot = typingBaselineDoc.current;
       typingBaselineDoc.current = null;
-      setUndoStack(prev => [...prev.slice(-25), snapshot]);
+      setUndoStack(prev => {
+        const nextState = pushHistoryMilestone({ undoStack: prev, redoStack: [] }, snapshot);
+        return nextState.undoStack;
+      });
       setRedoStack([]);
       setIsDirty(true);
     }
@@ -104,7 +113,10 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
   const pushImmediateHistory = useCallback((prevDoc: SOPDocument) => {
     if (isUndoRedoAction.current) return;
     flushTypingHistory();
-    setUndoStack(prev => [...prev.slice(-25), prevDoc]);
+    setUndoStack(prev => {
+      const nextState = pushHistoryMilestone({ undoStack: prev, redoStack: [] }, prevDoc);
+      return nextState.undoStack;
+    });
     setRedoStack([]);
     setIsDirty(true);
   }, [flushTypingHistory]);
@@ -215,29 +227,37 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
     flushTypingHistory();
     if (undoStack.length === 0) return;
     isUndoRedoAction.current = true;
-    const previous = undoStack[undoStack.length - 1];
-    setUndoStack(prev => prev.slice(0, prev.length - 1));
-    setRedoStack(prev => [...prev, document]);
-    setDocument(previous);
-    setIsDirty(true);
+
+    const result = performUndoStep({ undoStack, redoStack }, document);
+    if (result) {
+      setUndoStack(result.state.undoStack);
+      setRedoStack(result.state.redoStack);
+      setDocument(result.nextDoc);
+      setIsDirty(true);
+    }
+
     setTimeout(() => {
       isUndoRedoAction.current = false;
     }, 50);
-  }, [undoStack, document, flushTypingHistory]);
+  }, [undoStack, redoStack, document, flushTypingHistory]);
 
   const redo = useCallback(() => {
     flushTypingHistory();
     if (redoStack.length === 0) return;
     isUndoRedoAction.current = true;
-    const next = redoStack[redoStack.length - 1];
-    setRedoStack(prev => prev.slice(0, prev.length - 1));
-    setUndoStack(prev => [...prev, document]);
-    setDocument(next);
-    setIsDirty(true);
+
+    const result = performRedoStep({ undoStack, redoStack }, document);
+    if (result) {
+      setUndoStack(result.state.undoStack);
+      setRedoStack(result.state.redoStack);
+      setDocument(result.nextDoc);
+      setIsDirty(true);
+    }
+
     setTimeout(() => {
       isUndoRedoAction.current = false;
     }, 50);
-  }, [redoStack, document, flushTypingHistory]);
+  }, [redoStack, undoStack, document, flushTypingHistory]);
 
   // Initial local storage check - seed demonstration sample silently if absent
   useEffect(() => {

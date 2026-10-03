@@ -13,6 +13,7 @@ import {
 import { useSOP } from '../../state/documentContext';
 import { findSection } from '../../operations/sectionOperations';
 import { createEmptyContent } from '../../models/content';
+import { sharedEditorExtensions } from '../../editor/extensions';
 
 export const SOPEditor: React.FC = () => {
   const { document: doc, activeSectionId, updateSectionContent, updateSectionTitle } = useSOP();
@@ -22,16 +23,7 @@ export const SOPEditor: React.FC = () => {
   activeSectionIdRef.current = activeSection?.id;
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3]
-        }
-      }),
-      TextAlign.configure({
-        types: ['heading', 'paragraph']
-      })
-    ],
+    extensions: sharedEditorExtensions,
     content: activeSection ? activeSection.content : createEmptyContent(),
     editorProps: {
       attributes: {

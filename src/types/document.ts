@@ -90,6 +90,10 @@ export interface SOPSection {
   content: JSONContent;
   isMandatory: boolean;
   category?: SectionCategory;
+  /**
+   * Transient UI view state for outline accordion display.
+   * Does not alter semantic document content, touch updatedAt, or push undo/redo history.
+   */
   collapsed?: boolean;
   children?: SOPSection[];
   notes?: string;
