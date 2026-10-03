@@ -268,8 +268,8 @@ export const AppHeader: React.FC = () => {
               >
                 <Printer className="w-4 h-4 text-blue-600" />
                 <div>
-                  <div className="font-medium">Print to PDF / Paper</div>
-                  <div className="text-[11px] text-slate-400">Uses browser print layout configured for A4</div>
+                  <div className="font-medium">Browser Print / PDF (Prototype)</div>
+                  <div className="text-[11px] text-slate-400">Browser print subsystem styled for continuous A4 layout</div>
                 </div>
               </button>
               <button
@@ -280,11 +280,11 @@ export const AppHeader: React.FC = () => {
                 <FileCode className="w-4 h-4 text-emerald-600" />
                 <div>
                   <div className="font-medium">Export Structured JSON (.sop.json)</div>
-                  <div className="text-[11px] text-slate-400">Complete canonical document file</div>
+                  <div className="text-[11px] text-slate-400">Canonical structured AST document file</div>
                 </div>
               </button>
               <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400">
-                <span className="font-semibold text-slate-500">Upcoming in M1 / M2:</span> Word (.docx) and Standalone Vector PDF exporters.
+                <span className="font-semibold text-slate-500">Planned for M1 / M2:</span> Native Word (.docx) and dedicated PDF pagination renderer.
               </div>
             </div>
           )}

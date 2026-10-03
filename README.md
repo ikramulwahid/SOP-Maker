@@ -11,28 +11,28 @@ It operates completely frontend-only:
 * **No database server**
 * **No user accounts or authentication**
 * **No server-side document processing**
-* **All document data remains client-side** (Local browser storage with strict privacy)
+* **All document data remains client-side** (Local browser storage prototype with strict privacy)
 
 ---
 
 ## Architecture Overview
 
-SOPStudio enforces a single canonical document model rather than relying on raw HTML as the primary data store:
+SOPStudio enforces a single canonical document model using a structured ProseMirror/Tiptap representation (`JSONContent`) rather than raw HTML as the primary data store:
 
 ```
 SOPDocument
  ├── metadata           (Title, SOP Number, Version, Dates, Status, Authorship, Confidentiality)
  ├── branding           (Organization, Facility, Header/Footer banners)
- ├── pageSetup          (A4/Letter, Margins, Orientation, Watermarks, Headers)
+ ├── pageSetup          (A4/Letter configuration, Margins, Orientation, Watermarks, Headers)
  ├── style              (1 of 5 data-driven visual style configurations)
- ├── sections[]         (16 standardized regulatory sections with structured rich text)
+ ├── sections[]         (16 standardized sections with canonical structured JSONContent)
  ├── revisionHistory[]  (Version logs, dates, change justifications)
  ├── approvals[]        (Signatory blocks, roles, sign-off status, audit timestamps)
- ├── assets[]           (Embedded diagrams, attachments, figures)
+ ├── assets[]           (Diagrams, attachments, figures)
  └── settings           (Autosave, strict numbering, active template)
 ```
 
-The Editor, Outline, Properties Panel, Preview, Validation, and Exporters all operate concurrently on this shared representation.
+The Editor, Outline, Properties Panel, Preview, Validation Engine, and Exporters all operate concurrently on this shared representation. HTML is strictly a derived rendering and export artifact, never the canonical document storage format.
 
 ---
 
@@ -43,14 +43,14 @@ Visual styling is entirely data-driven via reusable theme configurations:
 1. **Corporate Professional**: Deep blue accent, structured bar headings, professional data tables, classic document header/footer.
 2. **Industrial**: Dark neutral palette with amber safety accents, high-contrast boxed headings, operational hazard priority.
 3. **Modern Minimal**: Generous whitespace, refined serif headings, clean hairline rules, zero visual clutter.
-4. **Quality / Compliance**: Audit-ready formal document control layout (cGMP/ISO 17025), boxed headers, formal revision table, signature grid.
+4. **Quality / Compliance**: Formal document control layout, boxed headers, formal revision table, signature grid.
 5. **Technical**: Cyan/slate precision palette, tabular monospace indicators, technical underline headings, formula-friendly tables.
 
 ---
 
 ## 16 Standard Regulatory Sections
 
-Every newly generated SOP initializes with the standard 16 regulatory sections:
+Every newly generated SOP initializes with the standard 16 sections:
 
 1. `1.0 Document Information`
 2. `2.0 Purpose`
@@ -85,7 +85,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` in your web browser.
+Open `http://localhost:3000` in your web browser. A fresh launch opens directly on **Home**.
 
 ### Building for Production
 
@@ -101,24 +101,31 @@ npm test
 
 ---
 
-## Implemented Scope (M0)
+## Scope Breakdown
 
-* [x] **Home Screen**: Product branding, New SOP wizard entry, Import JSON entry, demonstration sample loader, and Recent Documents list.
-* [x] **New SOP Workflow**: 3-step wizard (Template Selection $\to$ Metadata & Control Fields $\to$ Workspace Initialization).
-* [x] **5 Visual Themes**: Corporate, Industrial, Minimal, Compliance, Technical (selectable live with instant re-render).
-* [x] **Workspace 3-Pane Desktop Layout**: Collapsible Left Outline, Center Editor/Preview/Split view, Collapsible Right Properties Panel.
-* [x] **Structured Outline Component**: Active section indicator, real-time search/filter, mandatory section tags, expand/collapse.
-* [x] **Rich Text Editor Foundation**: Built with Tiptap (Headings H1-H3, Bold, Italic, Underline, Bullet Lists, Numbered Lists, Alignment).
-* [x] **A4 Paper-like Preview**: Realistic paper drop-shadow, running headers/footers, metadata table, revision log, signature blocks, zoom controls.
-* [x] **Properties Panel**: Form inputs for required and optional document control fields with real-time completeness percentage.
-* [x] **Realistic Demonstration SOP**: Preloaded with "Operation and Routine Maintenance of Laboratory pH Meter" (SOP-LAB-001).
-* [x] **Local Persistence & Export**: Saves to `localStorage`, exports canonical `.sop.json`, and triggers browser print-to-PDF.
-* [x] **Unit Testing**: Vitest test suite covering document creation, styles, metadata updates, section tracking, and JSON serialization.
+### Implemented in M0:
+* **Application Shell**: Desktop-first responsive layout with clean navigation and Top Bar contract.
+* **Home Screen**: Primary launch entry point, new SOP workflow entry, JSON import, demonstration sample loader, and recent documents list.
+* **New SOP Workflow**: 3-step creation wizard (Template Selection $\to$ Metadata & Document Control Fields $\to$ Workspace Initialization).
+* **Five Predefined Visual Styles**: Corporate, Industrial, Minimal, Compliance, and Technical themes (data/configuration-driven).
+* **Document Metadata Panel**: Form inputs for required and optional document control fields with real-time completeness percentage.
+* **Structured Outline**: Recursive tree outline supporting top-level and nested sections, active section indication, expand/collapse, and search filtering.
+* **Rich-Text Editor Foundation**: Built with Tiptap/ProseMirror storing canonical `JSONContent` (Headings H1-H3, Bold, Italic, Underline, Bullet Lists, Numbered Lists, Alignment).
+* **Structured Document Operations**: Pure non-React operations for recursive section traversal, immutable updates, and metadata manipulation.
+* **Illustrative Demonstration SOP**: Preloaded with "Operation and Routine Maintenance of Laboratory pH Meter" (`SOP-LAB-001`, illustrative simulated content for software evaluation).
+* **Client-Side Persistence Prototype**: Browser `localStorage` adapter conforming to `DocumentStorage` interface.
+* **Structured JSON Export**: Downloads canonical `.sop.json` file.
+* **Browser Print Prototype**: Continuous A4 layout preview and browser print trigger.
+* **Validation Foundation**: Required field audits and completeness scoring.
+* **Test Suite**: Vitest suite covering document creation, structured AST content, nested section operations, templates, and validation.
 
----
-
-## Planned Work Packages
-
-* **M1**: Rich Table Editor, Callout blocks (Note, Caution, Warning), Step-by-Step procedure step numbering, and Native `.docx` exporter.
-* **M2**: Standalone Vector PDF renderer, `.docx` document importer, and drag-and-drop section reordering.
-* **M3**: Optional AI Assistant (Gemini) for procedural clarity review, missing section suggestion, and safety hazard gap checks (human-in-the-loop review required).
+### Deferred to Future Work Packages:
+* **IndexedDB Production Storage**: High-capacity client-side database (planned for production).
+* **Rich Data Tables**: Structured table editing inside procedure blocks.
+* **Callouts & Admonitions**: Standardized Note, Caution, and Warning callout components.
+* **Procedure-Step Blocks**: Discrete interactive step components with branching.
+* **Formulas & Equations**: LaTeX / MathML scientific formula rendering.
+* **Embedded Image Assets**: Client-side asset storage and diagram embedding.
+* **DOCX Import & Export**: Word document parser and native `.docx` generator.
+* **Production PDF Engine & Advanced Pagination**: Multi-page canvas layout engine with exact page numbering and headers/footers.
+* **AI Assistance**: Optional Gemini service for procedural clarity and hazard reviews (operator-in-the-loop review required).

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Plus, Upload, FolderOpen, FileText, CheckCircle2, 
-  Clock, ArrowRight, ShieldCheck, Trash2, AlertCircle, Sparkles, BookOpen
+  Plus, Upload, FileText, CheckCircle2, 
+  ArrowRight, ShieldCheck, Trash2, AlertCircle, BookOpen
 } from 'lucide-react';
 import { useSOP } from '../../state/documentContext';
-import { DocumentSummary, SOPDocument } from '../../types/document';
+import { DocumentSummary } from '../../types/document';
 import { documentStorage } from '../../storage/localStorageAdapter';
 import { importers } from '../../import/documentImporter';
 import { SAMPLE_LAB_SOP } from '../../data/sampleSop';
 
 export const HomeScreen: React.FC = () => {
-  const { startNewDocumentFlow, loadDocument, loadSampleDocument, setCurrentScreen } = useSOP();
+  const { startNewDocumentFlow, loadDocument, loadSampleDocument } = useSOP();
   const [recents, setRecents] = useState<DocumentSummary[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,13 +74,13 @@ export const HomeScreen: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 uppercase tracking-wider font-mono">
             <ShieldCheck className="w-4 h-4" />
-            <span>Laboratory Document Control System</span>
+            <span>Structured Document Authoring System</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
             Standard Operating Procedure Studio
           </h1>
           <p className="text-base text-slate-600 max-w-2xl leading-relaxed">
-            Create, format, structure, and preview laboratory Standard Operating Procedures. Designed for strict audit compliance (ISO 17025, cGMP, GLP) with client-side document sovereignty.
+            Create, format, structure, and preview laboratory Standard Operating Procedures. Built for structured document control, completeness checks, and consistent formatting with client-side document privacy.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export const HomeScreen: React.FC = () => {
                 New SOP Document
               </h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Start from a clean slate with 16 standardized regulatory sections and predefined visual styles.
+                Start from a clean foundation with 16 standardized sections and your choice of 5 visual styles.
               </p>
             </div>
             <div className="mt-6 flex items-center gap-1.5 text-xs font-medium text-blue-600 group-hover:translate-x-0.5 transition-transform">
@@ -121,7 +121,7 @@ export const HomeScreen: React.FC = () => {
                 Load pH Meter Sample SOP
               </h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Explore an authentic 16-section analytical calibration procedure (SOP-LAB-001) with full revision history and approvals.
+                Explore an illustrative 16-section demonstration calibration procedure (SOP-LAB-001) with sample revision logs and approval blocks.
               </p>
             </div>
             <div className="mt-6 flex items-center gap-1.5 text-xs font-medium text-slate-700 group-hover:translate-x-0.5 transition-transform">
@@ -176,7 +176,7 @@ export const HomeScreen: React.FC = () => {
                 Recent Procedures
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Locally saved SOP documents stored securely in your browser cache.
+                Locally saved SOP documents stored in browser localStorage prototype (IndexedDB planned for production).
               </p>
             </div>
             <span className="text-xs font-mono text-slate-400">
@@ -247,18 +247,18 @@ export const HomeScreen: React.FC = () => {
           )}
         </section>
 
-        {/* Feature Roadmap & Architecture Overview */}
+        {/* Feature Scope & Architecture Overview */}
         <section className="p-6 bg-slate-100 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
           <div className="font-semibold text-slate-800 flex items-center gap-2 font-mono uppercase tracking-wider text-[11px]">
-            <span>M0 Working Product Skeleton Status</span>
+            <span>M0 Working Product Skeleton Scope</span>
           </div>
           <p>
-            SOPStudio operates 100% client-side with no server or external database dependency. In M0, the canonical document model powers the Editor, Outline, Metadata Panel, 5 Predefined Visual Styles, and A4 Paper-like Print/PDF export.
+            SOPStudio operates 100% client-side with no backend server or database dependency. In M0, the canonical structured JSON document model powers the Editor, Outline, Metadata Panel, 5 Predefined Visual Styles, JSON export, and browser print layout prototype.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 text-[11px] font-mono">
             <div className="flex items-center gap-1.5 text-emerald-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Structured Model</span>
+              <span>Structured AST Model</span>
             </div>
             <div className="flex items-center gap-1.5 text-emerald-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -266,11 +266,11 @@ export const HomeScreen: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-emerald-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Rich Text Editor</span>
+              <span>Tiptap Editor</span>
             </div>
             <div className="flex items-center gap-1.5 text-emerald-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>A4 Print & JSON</span>
+              <span>Print Prototype & JSON</span>
             </div>
           </div>
         </section>

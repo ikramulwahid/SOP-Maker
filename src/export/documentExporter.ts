@@ -29,12 +29,13 @@ export class JSONExporter implements DocumentExporter {
 }
 
 /**
- * Print / PDF Exporter - fully implemented in M0.
- * Leverages the browser print subsystem formatted for A4 physical document export.
+ * Browser Print Exporter - prototype implemented in M0.
+ * Leverages the browser print subsystem formatted for A4 continuous document layout.
+ * Dedicated pagination and PDF rendering engine are scheduled for M2.
  */
 export class PrintExporter implements DocumentExporter {
   readonly formatId = 'print';
-  readonly formatName = 'Browser Print / PDF';
+  readonly formatName = 'Browser Print / PDF Prototype';
   readonly fileExtension = '.pdf';
   readonly isSupported = true;
 

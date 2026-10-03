@@ -1,5 +1,7 @@
 import { SOPDocument } from '../types/document';
 import { ValidationError, ValidationEngine, ValidationResult } from './types';
+import { extractPlainText } from '../models/content';
+import { flattenSections } from '../operations/sectionOperations';
 
 export class StandardValidationEngine implements ValidationEngine {
   validate(doc: SOPDocument): ValidationResult {
@@ -11,7 +13,7 @@ export class StandardValidationEngine implements ValidationEngine {
     const warnings = allIssues.filter(i => i.severity === 'warning');
     const infos = allIssues.filter(i => i.severity === 'info');
 
-    // Calculate completion score
+    // Calculate document completeness score
     const requiredMetadataFields = [
       'title', 'sopNumber', 'version', 'effectiveDate', 
       'reviewDate', 'department', 'processOwner', 'author', 'approver'
@@ -22,11 +24,12 @@ export class StandardValidationEngine implements ValidationEngine {
       if (doc.metadata[f] && doc.metadata[f].trim() !== '') filledRequiredMeta++;
     });
 
-    const mandatorySections = doc.sections.filter(s => s.isMandatory);
+    const allSections = flattenSections(doc.sections);
+    const mandatorySections = allSections.filter(s => s.isMandatory);
     let filledSections = 0;
     mandatorySections.forEach(s => {
-      const stripped = s.content.replace(/<[^>]*>/g, '').trim();
-      if (stripped.length > 15) filledSections++;
+      const text = extractPlainText(s.content).trim();
+      if (text.length > 10) filledSections++;
     });
 
     const totalWeight = requiredMetadataFields.length + mandatorySections.length;
@@ -81,14 +84,15 @@ export class StandardValidationEngine implements ValidationEngine {
 
   validateSections(doc: SOPDocument): ValidationError[] {
     const issues: ValidationError[] = [];
+    const allSections = flattenSections(doc.sections);
 
-    doc.sections.forEach(section => {
-      const text = section.content.replace(/<[^>]*>/g, '').trim();
+    allSections.forEach(section => {
+      const text = extractPlainText(section.content).trim();
       if (section.isMandatory && text.length === 0) {
         issues.push({
           field: `section-${section.id}`,
           sectionId: section.id,
-          message: `Mandatory section "${section.number} ${section.title}" has no content.`,
+          message: `Mandatory section "${section.number} ${section.title}" has no content recorded.`,
           severity: 'error'
         });
       }

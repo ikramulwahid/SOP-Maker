@@ -6,6 +6,10 @@
  * operate on this canonical data model.
  */
 
+import type { JSONContent } from '@tiptap/core';
+
+export type { JSONContent };
+
 export type SOPStatus = 'Draft' | 'Under Review' | 'Approved' | 'Obsolete';
 
 export type ConfidentialityLevel = 'Public' | 'Internal' | 'Confidential' | 'Restricted';
@@ -21,6 +25,11 @@ export interface PageMargins {
   unit: 'mm' | 'in';
 }
 
+/**
+ * Page setup configuration stored in canonical document.
+ * Note: M0 renders an A4 portrait document preview prototype. Full multi-format
+ * layout engine and custom margins are scheduled for the M2 pagination milestone.
+ */
 export interface PageSetup {
   paperSize: PaperSize;
   orientation: PageOrientation;
@@ -74,7 +83,11 @@ export interface SOPSection {
   id: string;
   number: string; // e.g. "1.0", "2.0", "8.1"
   title: string;
-  content: string; // Structured rich text HTML representation
+  /**
+   * Canonical structured rich-text representation (Tiptap/ProseMirror JSONContent).
+   * Raw HTML is never the canonical data format; it is derived strictly for rendering/export.
+   */
+  content: JSONContent;
   isMandatory: boolean;
   category?: SectionCategory;
   collapsed?: boolean;

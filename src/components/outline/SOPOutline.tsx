@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import { 
-  ChevronRight, ChevronDown, CheckCircle2, 
-  Search, ShieldAlert, FileText, Settings, Award, 
-  AlertTriangle, Wrench, Layers
+  ChevronRight, ChevronDown, 
+  Search, ShieldAlert, FileText, Award, 
+  Wrench, Layers
 } from 'lucide-react';
 import { useSOP } from '../../state/documentContext';
 import { SOPSection, SectionCategory } from '../../types/document';
+import { countSections } from '../../operations/sectionOperations';
 
 export const SOPOutline: React.FC = () => {
   const { document: doc, activeSectionId, selectSection, toggleSectionCollapse } = useSOP();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const filteredSections = doc.sections.filter(sec => 
-    sec.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    sec.number.includes(searchQuery)
-  );
 
   const getCategoryIcon = (category?: SectionCategory) => {
     switch (category) {
@@ -31,6 +27,83 @@ export const SOPOutline: React.FC = () => {
     }
   };
 
+  const totalSectionCount = countSections(doc.sections);
+
+  // Recursive item renderer supporting nested section trees
+  const renderSectionItem = (sec: SOPSection, depth = 0) => {
+    const isActive = sec.id === activeSectionId;
+    const hasChildren = Boolean(sec.children && sec.children.length > 0);
+    const matchesSearch = searchQuery.trim() === '' || 
+      sec.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sec.number.includes(searchQuery);
+
+    return (
+      <React.Fragment key={sec.id}>
+        {matchesSearch && (
+          <div
+            className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-blue-600 text-white font-medium shadow-sm'
+                : 'text-slate-700 hover:bg-slate-200/60'
+            }`}
+            style={{ paddingLeft: `${depth * 14 + 10}px` }}
+            onClick={() => selectSection(sec.id)}
+          >
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              {hasChildren ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSectionCollapse(sec.id);
+                  }}
+                  className={`p-0.5 rounded hover:bg-black/10 ${isActive ? 'text-white' : 'text-slate-400'}`}
+                  aria-label="Toggle subsection expand"
+                >
+                  {sec.collapsed ? (
+                    <ChevronRight className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+              ) : (
+                <span className="w-3 shrink-0" />
+              )}
+
+              <span className={`font-mono text-[11px] shrink-0 ${isActive ? 'text-blue-100 font-semibold' : 'text-slate-500'}`}>
+                {sec.number}
+              </span>
+
+              <span className="truncate">
+                {sec.title}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+              {!isActive && getCategoryIcon(sec.category)}
+              {sec.isMandatory && (
+                <span 
+                  title="Standard Mandatory Section" 
+                  className={`text-[9px] px-1 rounded font-mono ${
+                    isActive ? 'bg-blue-500/80 text-blue-100' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  REQ
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {hasChildren && !sec.collapsed && (
+          <div className="space-y-0.5">
+            {sec.children!.map(child => renderSectionItem(child, depth + 1))}
+          </div>
+        )}
+      </React.Fragment>
+    );
+  };
+
   return (
     <aside className="w-full h-full flex flex-col bg-slate-50 border-r border-slate-200 select-none">
       {/* Outline Header */}
@@ -40,7 +113,7 @@ export const SOPOutline: React.FC = () => {
             Document Outline
           </span>
           <span className="text-xs text-slate-500 font-mono tabular-nums">
-            {doc.sections.length} Sections
+            {totalSectionCount} Sections
           </span>
         </div>
 
@@ -59,71 +132,12 @@ export const SOPOutline: React.FC = () => {
 
       {/* Sections List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {filteredSections.length === 0 ? (
+        {doc.sections.length === 0 ? (
           <div className="p-4 text-center text-xs text-slate-400">
-            No sections matching "{searchQuery}"
+            No sections available
           </div>
         ) : (
-          filteredSections.map((sec) => {
-            const isActive = sec.id === activeSectionId;
-            const hasChildren = Boolean(sec.children && sec.children.length > 0);
-
-            return (
-              <div
-                key={sec.id}
-                className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                  isActive
-                    ? 'bg-blue-600 text-white font-medium shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-200/60'
-                }`}
-                onClick={() => selectSection(sec.id)}
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSectionCollapse(sec.id);
-                      }}
-                      className={`p-0.5 rounded hover:bg-black/10 ${isActive ? 'text-white' : 'text-slate-400'}`}
-                      aria-label="Toggle section"
-                    >
-                      {sec.collapsed ? (
-                        <ChevronRight className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  ) : (
-                    <span className="w-3" />
-                  )}
-
-                  <span className={`font-mono text-[11px] shrink-0 ${isActive ? 'text-blue-100 font-semibold' : 'text-slate-500'}`}>
-                    {sec.number}
-                  </span>
-
-                  <span className="truncate">
-                    {sec.title}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                  {!isActive && getCategoryIcon(sec.category)}
-                  {sec.isMandatory && (
-                    <span 
-                      title="Mandatory ISO/GLP Section" 
-                      className={`text-[9px] px-1 rounded font-mono ${
-                        isActive ? 'bg-blue-500/80 text-blue-100' : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      REQ
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
+          doc.sections.map(sec => renderSectionItem(sec, 0))
         )}
       </div>
 

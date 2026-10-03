@@ -1,11 +1,15 @@
 import React from 'react';
 import { useSOP } from '../../state/documentContext';
 import { TemplateStyleId } from '../../types/document';
-import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Clock } from 'lucide-react';
+import { contentToHTML } from '../../models/content';
+import { flattenSections } from '../../operations/sectionOperations';
 
 export const SOPPreview: React.FC = () => {
   const { document: doc, selectSection } = useSOP();
-  const { metadata, branding, style, sections, revisionHistory, approvals } = doc;
+  const { metadata, branding, style, revisionHistory, approvals } = doc;
+
+  const allSections = flattenSections(doc.sections);
 
   const getHeadingContainerClass = (styleId: TemplateStyleId) => {
     switch (styleId) {
@@ -55,7 +59,7 @@ export const SOPPreview: React.FC = () => {
 
   return (
     <div className="w-full flex justify-center py-6 px-2 overflow-y-auto">
-      {/* A4 Paper Canvas Metaphor */}
+      {/* A4 Paper Canvas Metaphor (Print-ready continuous document view) */}
       <article
         id="sop-printable-sheet"
         className="w-full max-w-[820px] min-h-[1160px] bg-white shadow-xl rounded-sm border border-slate-300 flex flex-col justify-between transition-all duration-200 print:shadow-none print:border-none print:m-0 print:w-full print:max-w-none text-slate-900 leading-relaxed font-sans"
@@ -91,7 +95,7 @@ export const SOPPreview: React.FC = () => {
               {metadata.title}
             </h1>
             <p className="text-xs text-slate-500 mt-1 font-mono">
-              Controlled Standard Operating Procedure
+              Standard Operating Procedure · Controlled Document
             </p>
           </section>
 
@@ -146,31 +150,36 @@ export const SOPPreview: React.FC = () => {
 
           {/* Structured Document Sections */}
           <main className="space-y-6">
-            {sections.map((section) => (
-              <section 
-                key={section.id} 
-                id={`preview-sec-${section.id}`}
-                className="group relative cursor-pointer"
-                onClick={() => selectSection(section.id)}
-              >
-                {/* Heading */}
-                <div className={getHeadingContainerClass(style.id)}>
-                  <span>
-                    <span className="font-mono mr-2">{section.number}</span>
-                    {section.title}
-                  </span>
-                  <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity font-mono font-normal">
-                    Click to edit
-                  </span>
-                </div>
+            {allSections.map((section) => {
+              const html = contentToHTML(section.content);
+              return (
+                <section 
+                  key={section.id} 
+                  id={`preview-sec-${section.id}`}
+                  className="group relative cursor-pointer"
+                  onClick={() => selectSection(section.id)}
+                >
+                  {/* Heading */}
+                  <div className={getHeadingContainerClass(style.id)}>
+                    <span>
+                      <span className="font-mono mr-2">{section.number}</span>
+                      {section.title}
+                    </span>
+                    <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity font-mono font-normal">
+                      Click to edit
+                    </span>
+                  </div>
 
-                {/* Content Rendered */}
-                <div 
-                  className="prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed pl-1"
-                  dangerouslySetInnerHTML={{ __html: section.content || '<p class="text-slate-400 italic">No content recorded for this section.</p>' }}
-                />
-              </section>
-            ))}
+                  {/* Content Rendered from Canonical JSONContent */}
+                  <div 
+                    className="prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed pl-1"
+                    dangerouslySetInnerHTML={{ 
+                      __html: html || '<p class="text-slate-400 italic">No content recorded for this section.</p>' 
+                    }}
+                  />
+                </section>
+              );
+            })}
           </main>
 
           {/* Formal Revision History Table */}
@@ -244,13 +253,13 @@ export const SOPPreview: React.FC = () => {
           </section>
         </div>
 
-        {/* Running Document Footer */}
-        <footer className="mt-12 pt-3 border-t border-slate-300 text-[10px] text-slate-500 flex items-center justify-between font-mono">
+        {/* Running Document Footer (Honest labeling for continuous layout prototype) */}
+        <footer className="mt-12 pt-3 border-t border-slate-300 text-[10px] text-slate-500 flex flex-wrap items-center justify-between gap-2 font-mono">
           <div>
             {branding.footerText}
           </div>
-          <div className="tabular-nums">
-            {metadata.sopNumber} · Page 1 of 1
+          <div className="tabular-nums text-slate-400">
+            {metadata.sopNumber} · Continuous Layout Prototype
           </div>
         </footer>
       </article>

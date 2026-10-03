@@ -4,9 +4,9 @@
 
 SOPStudio is constructed around a fundamental architectural invariant:
 
-> **The primary document model is NOT raw HTML.**
+> **The canonical document model is NOT raw HTML.**
 
-Rather than allowing an uncontrolled WYSIWYG editor to mutate an arbitrary DOM tree, SOPStudio implements a typed, structured, and serializable `SOPDocument` data model. All components (Editor, Outline, Metadata Panel, Preview, Validation, Importers, and Exporters) read from and write to this authoritative contract.
+Rather than allowing an uncontrolled WYSIWYG editor to mutate an arbitrary DOM tree or storing HTML strings in state, SOPStudio implements a typed, structured, and serializable `SOPDocument` data model based on ProseMirror / Tiptap `JSONContent`. All application components operate on this single authoritative contract:
 
 ```
                   ┌───────────────────────┐
@@ -18,22 +18,28 @@ Rather than allowing an uncontrolled WYSIWYG editor to mutate an arbitrary DOM t
      │                       │                        │
 ┌────▼────────┐       ┌──────▼─────┐           ┌──────▼──────┐
 │  SOPEditor  │       │ SOPOutline │           │  Properties │
-│   (Tiptap)  │       │  (Sections)│           │  (Metadata) │
+│ (JSONContent│       │(Tree Nodes)│           │  (Metadata) │
 └────┬────────┘       └──────┬─────┘           └──────┬──────┘
      │                       │                        │
      └───────────────────────┼────────────────────────┘
                              │
                   ┌──────────▼────────────┐
+                  │  Document Operations  │
+                  │ (Pure Non-React Fns)  │
+                  └──────────┬────────────┘
+                             │
+                  ┌──────────▼────────────┐
                   │    DocumentContext    │
-                  │   Central Store &     │
-                  │    History Stack      │
+                  │ (Thin React State &   │
+                  │  Debounced History)   │
                   └──────────┬────────────┘
                              │
          ┌───────────────────┴───────────────────┐
          │                                       │
 ┌────────▼──────────┐                   ┌────────▼──────────┐
 │  DocumentStorage  │                   │  DocumentExporter │
-│  (LocalStorage)   │                   │  (JSON / Print)   │
+│ (localStorage M0  │                   │  (JSON / Print    │
+│  IndexedDB Prod)  │                   │     Prototype)    │
 └───────────────────┘                   └───────────────────┘
 ```
 
@@ -41,7 +47,7 @@ Rather than allowing an uncontrolled WYSIWYG editor to mutate an arbitrary DOM t
 
 ## 2. Document Model (`src/types/document.ts`)
 
-The canonical `SOPDocument` interface is composed of structured sub-domains:
+The canonical `SOPDocument` interface is composed of strongly typed sub-domains:
 
 ```typescript
 export interface SOPDocument {
@@ -51,9 +57,9 @@ export interface SOPDocument {
   updatedAt: string;
   metadata: SOPMetadata;            // Document control, numbering, audit dates, personnel
   branding: BrandingSettings;       // Organization name, department code, header/footer
-  pageSetup: PageSetup;             // Paper size (A4), margins, orientation, watermarks
+  pageSetup: PageSetup;             // Paper size configuration, margins, orientation
   style: SOPStyle;                  // Active theme configuration (1 of 5 styles)
-  sections: SOPSection[];           // 16 Standardized regulatory sections
+  sections: SOPSection[];           // 16 Standard sections with canonical JSONContent
   revisionHistory: RevisionEntry[]; // Change justification log
   approvals: ApprovalEntry[];       // Multi-signatory authorization blocks
   assets: Asset[];                  // Diagrams, attachments, figures
@@ -62,81 +68,70 @@ export interface SOPDocument {
 ```
 
 ### Key Sub-Models:
-* `SOPMetadata`: Encapsulates mandatory ISO/GLP fields (`title`, `sopNumber`, `version`, `effectiveDate`, `reviewDate`, `department`, `processOwner`, `author`, `approver`, `status`, `confidentiality`) alongside optional organizational fields.
-* `SOPSection`: Represents an atomic document chapter with unique stable `id`, regulatory hierarchy `number` (e.g. `9.0`), category (`procedural`, `safety`, `governance`, `quality`, `admin`), `isMandatory` flag, and rich-text HTML `content`.
-* `SOPStyle`: Data-driven presentation tokens controlling typography, accent colors, table border styles, and heading ornamentation without altering semantic data.
+* `SOPSection`: Represents an atomic document chapter with unique stable `id`, hierarchy `number` (e.g. `9.0`), category (`procedural`, `safety`, `governance`, `quality`, `admin`), `isMandatory` flag, `children?: SOPSection[]` for nested chapters, and canonical structured `content: JSONContent`.
+* `SOPMetadata`: Encapsulates mandatory document control fields (`title`, `sopNumber`, `version`, `effectiveDate`, `reviewDate`, `department`, `processOwner`, `author`, `approver`, `status`, `confidentiality`) alongside optional organizational fields.
+* `PageSetup`: Stores document layout preferences. *Note:* In M0, the print stylesheet renders an A4 continuous portrait sheet prototype; full multi-format layout and dynamic page splitting belong to the planned M2 pagination engine.
 
 ---
 
-## 3. Major Application Modules
+## 3. Separation of Concerns: 4-Tier Architecture
 
-### 3.1 Application Shell (`src/components/shell/`)
-* **`AppHeader.tsx`**: Complies with the single-row Top Bar Contract. Houses brand wordmark, view switches (Home, Editor, Preview, Split), undo/redo controls, theme switcher dropdown, save button, and export trigger.
-* **`Workspace.tsx`**: Three-pane responsive workstation orchestrating the Left Outline (280px), Center Content Viewport (Editor, A4 Preview, or Split View), and Right Properties Panel (320px).
+To keep the codebase maintainable and independent of UI rendering details, the architecture enforces a strict 4-tier separation:
 
-### 3.2 Document Editor Foundation (`src/components/editor/`)
-* Built atop `@tiptap/react` and ProseMirror.
-* Encapsulates rich-text mutations (H1–H3, Bold, Italic, Underline, Bullet Lists, Numbered Lists, Text Alignment).
-* Emits sanitized HTML strings back to the centralized `updateSectionContent` action.
-
-### 3.3 Structured Outline (`src/components/outline/`)
-* Provides interactive navigation across all 16 default sections.
-* Includes real-time filter search and mandatory section visual indicators.
-* Maintains active section synchronization between outline, editor, and preview sheet.
-
-### 3.4 Preview & Paper Rendering (`src/components/preview/`)
-* Translates the active `SOPDocument` into an A4 physical paper sheet (`#sop-printable-sheet`).
-* Formats running headers, metadata control tables, dynamic heading styles, revision logs, and signature blocks.
-* Fully styled for `@media print` browser-native PDF export.
-
-### 3.5 Metadata Panel (`src/components/metadata/`)
-* Properties sidebar providing input controls for required and optional document control fields.
-* Real-time calculation of document completion percentage via the `ValidationEngine`.
-
-### 3.6 Creation Wizard (`src/components/wizard/`)
-* 3-step initialization flow:
-  1. Template Selection (Visual cards for 5 styles)
-  2. Metadata Entry (Validation check on required inputs)
-  3. Confirmation Summary (Prepopulates the 16 standard sections into active workspace)
+1. **Tier 1: Document Model (`src/types/`)**
+   - Canonical types, interfaces, and enums.
+   - Zero framework dependencies.
+2. **Tier 2: Document Operations (`src/operations/`, `src/models/content.ts`)**
+   - Pure, non-React helper functions (`updateDocumentMetadata`, `findSection`, `updateSectionTitle`, `updateSectionContent`, `flattenSections`, `contentToHTML`, `extractPlainText`).
+   - Handles recursive tree traversal for nested sections.
+   - Reusable across editors, outlines, validation, import/export tools, and future AI helpers.
+3. **Tier 3: React State Management (`src/state/`)**
+   - Thin `DocumentProvider` managing screen routing (`home`, `workspace`, `new-wizard`), view modes, and undo/redo stacks.
+   - Debounces rapid typing keystroke updates to prevent memory bloat, while recording discrete milestones for structural edits.
+4. **Tier 4: UI Components (`src/components/`)**
+   - Presentational components consuming `useSOP()` hook.
+   - Strictly client-side; no backend calls, no telemetry, no simulated APIs.
 
 ---
 
-## 4. Extension Strategy
+## 4. Local Persistence Strategy
 
-### 4.1 Storage Adapter (`src/storage/`)
-The `DocumentStorage` interface abstracts client-side persistence:
+In M0, client-side persistence is implemented via a browser `localStorage` adapter (`LocalStorageDocumentAdapter`) implementing the generic `DocumentStorage` interface:
+
 ```typescript
 export interface DocumentStorage {
   save(document: SOPDocument): Promise<void>;
   get(id: string): Promise<SOPDocument | null>;
   listRecent(): Promise<DocumentSummary[]>;
   delete(id: string): Promise<void>;
+  exportToJSONString(document: SOPDocument): string;
+  importFromJSONString(json: string): SOPDocument;
 }
 ```
-Currently implemented via `LocalStorageDocumentAdapter`. In future work packages, this can be swapped with IndexedDB or File System Access API without modifying UI components.
 
-### 4.2 Exporter & Importer Interfaces (`src/export/`, `src/import/`)
-Exporters and Importers adhere to polymorphism:
-```typescript
-export interface DocumentExporter {
-  readonly formatId: string;
-  readonly formatName: string;
-  readonly fileExtension: string;
-  readonly isSupported: boolean;
-  exportDocument(doc: SOPDocument, options?: ExportOptions): Promise<void>;
-}
-```
-* `JSONExporter`: Supported (M0)
-* `PrintExporter`: Supported (M0)
-* `DOCXExporter`: Scheduled for M1
-* `VectorPDFExporter`: Scheduled for M2
+* **Current M0 Storage:** `localStorage` prototype (adequate for lightweight prototype documents and recent document registry).
+* **Planned Production Storage:** `IndexedDB` adapter designed to store high-resolution images, large embedded assets, and extensive offline SOP libraries without quota constraints.
 
 ---
 
-## 5. AI Boundary & Future Gemini Integration
+## 5. Scope & Work Package Roadmap
 
-The architecture strictly separates core document authoring from artificial intelligence services.
+### Implemented in M0:
+* Application shell with 3-zone Top Bar contract.
+* Primary Home screen entry point.
+* 3-step New SOP creation wizard.
+* 5 predefined visual themes (Corporate, Industrial, Minimal, Compliance, Technical).
+* Canonical document model with structured Tiptap/ProseMirror `JSONContent`.
+* Pure recursive operations for nested sections.
+* Rich-text editor foundation.
+* Structured outline with search filter and section badges.
+* Properties panel with required-field indicators and completeness scoring.
+* Illustrative demonstration SOP ("Operation and Routine Maintenance of Laboratory pH Meter").
+* Canonical structured `.sop.json` import and export.
+* Continuous A4 browser print/PDF prototype.
+* Automated Vitest unit test suite.
 
-* **No Automatic Overwrites**: Any future Gemini integration (Work Package M3) will produce `AISuggestion` proposals (e.g. identifying missing safety PPE or ambiguous step instructions).
-* **Mandatory Operator Review**: Suggestions must be explicitly approved or edited by the technician before modifying the canonical `SOPDocument`.
-* **Zero Fabrication**: AI services are instructed never to invent laboratory quantities, chemical concentrations, or calibration tolerances.
+### Deferred Work Packages:
+* **M1**: Rich data tables, Callout admonitions (Note/Caution/Warning), Step-by-Step procedure step blocks, and Native `.docx` exporter.
+* **M2**: IndexedDB production storage, Standalone Vector PDF renderer, `.docx` document importer, and section drag-and-drop reordering.
+* **M3**: Optional AI Assistant (Gemini) for procedural clarity reviews, safety gap checks, and section suggestions (strictly operator-reviewed; no automatic parameter invention).

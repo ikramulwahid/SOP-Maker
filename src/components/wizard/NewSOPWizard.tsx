@@ -222,7 +222,7 @@ export const NewSOPWizard: React.FC = () => {
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5 text-xs">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider font-mono">
-                Mandatory Regulatory Metadata
+                Required Document Control Metadata
               </h2>
               <p className="text-xs text-slate-500 mt-1">
                 Enter primary document identifiers. These fields populate the document control header and cover page.
@@ -385,7 +385,7 @@ export const NewSOPWizard: React.FC = () => {
                 Document Configuration Review
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Your new Standard Operating Procedure will be initialized with the selected theme and the 16 regulatory default sections.
+                Your new Standard Operating Procedure will be initialized with the selected theme and the 16 standard section chapters.
               </p>
             </div>
 
@@ -410,7 +410,7 @@ export const NewSOPWizard: React.FC = () => {
 
             <div>
               <h3 className="font-semibold text-slate-800 mb-2 font-mono text-[11px] uppercase tracking-wider">
-                16 Pre-Populated Structural Sections:
+                16 Pre-Populated Standard Sections:
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-600 font-mono">
                 {DEFAULT_SECTION_TEMPLATES.map((s) => (

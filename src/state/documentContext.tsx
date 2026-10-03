@@ -1,9 +1,25 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
-import { SOPDocument, SOPMetadata, SOPSection, TemplateStyleId, BrandingSettings, PageSetup } from '../types/document';
+import { 
+  SOPDocument, 
+  SOPMetadata, 
+  TemplateStyleId, 
+  BrandingSettings, 
+  PageSetup, 
+  JSONContent 
+} from '../types/document';
 import { SAMPLE_LAB_SOP } from '../data/sampleSop';
 import { createBlankDocument, CreateDocumentOptions } from '../templates/defaultDocument';
 import { TEMPLATE_STYLES } from '../templates/styles';
 import { documentStorage } from '../storage/localStorageAdapter';
+import { 
+  updateDocumentMetadata, 
+  updateDocumentBranding, 
+  updateDocumentPageSetup, 
+  updateDocumentStyle, 
+  updateDocumentSectionTitle, 
+  updateDocumentSectionContent, 
+  toggleDocumentSectionCollapse 
+} from '../operations/documentOperations';
 
 export type ViewMode = 'editor' | 'preview' | 'split';
 export type AppScreen = 'home' | 'workspace' | 'new-wizard';
@@ -32,11 +48,11 @@ interface DocumentContextType {
   createNewDocument: (options: CreateDocumentOptions) => void;
   saveDocument: () => Promise<void>;
   
-  // Granular Document Updates
+  // Granular Document Updates (operating on canonical model)
   updateMetadata: (metadata: Partial<SOPMetadata>) => void;
   updateBranding: (branding: Partial<BrandingSettings>) => void;
   updatePageSetup: (pageSetup: Partial<PageSetup>) => void;
-  updateSectionContent: (sectionId: string, content: string) => void;
+  updateSectionContent: (sectionId: string, content: JSONContent) => void;
   updateSectionTitle: (sectionId: string, title: string) => void;
   setTemplateStyle: (styleId: TemplateStyleId) => void;
   toggleSectionCollapse: (sectionId: string) => void;
@@ -52,7 +68,10 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [document, setDocument] = useState<SOPDocument>(SAMPLE_LAB_SOP);
   const [activeSectionId, setActiveSectionId] = useState<string>(SAMPLE_LAB_SOP.sections[0]?.id || 'sec-1');
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('workspace');
+  
+  // Correct M0 initial state: App MUST launch on 'home', not inside workspace
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
+  
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [zoom, setZoom] = useState<number>(100);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -61,37 +80,58 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [undoStack, setUndoStack] = useState<SOPDocument[]>([]);
   const [redoStack, setRedoStack] = useState<SOPDocument[]>([]);
 
-  // Prevent undo recording during undo/redo actions
+  // Prevent undo recording during undo/redo execution
   const isUndoRedoAction = useRef(false);
 
-  // Push to history helper
-  const pushHistory = useCallback((prevDoc: SOPDocument) => {
-    if (isUndoRedoAction.current) return;
-    setUndoStack(prev => [...prev.slice(-20), prevDoc]); // keep last 20 revisions
-    setRedoStack([]); // clear redo on new modification
-    setIsDirty(true);
+  // Keystroke debouncing ref for rich text editor typing
+  const typingBaselineDoc = useRef<SOPDocument | null>(null);
+  const typingDebounceTimer = useRef<number | null>(null);
+
+  const flushTypingHistory = useCallback(() => {
+    if (typingDebounceTimer.current) {
+      window.clearTimeout(typingDebounceTimer.current);
+      typingDebounceTimer.current = null;
+    }
+    if (typingBaselineDoc.current && !isUndoRedoAction.current) {
+      const snapshot = typingBaselineDoc.current;
+      typingBaselineDoc.current = null;
+      setUndoStack(prev => [...prev.slice(-25), snapshot]);
+      setRedoStack([]);
+      setIsDirty(true);
+    }
   }, []);
+
+  const pushImmediateHistory = useCallback((prevDoc: SOPDocument) => {
+    if (isUndoRedoAction.current) return;
+    flushTypingHistory();
+    setUndoStack(prev => [...prev.slice(-25), prevDoc]);
+    setRedoStack([]);
+    setIsDirty(true);
+  }, [flushTypingHistory]);
 
   const selectSection = useCallback((sectionId: string) => {
+    flushTypingHistory();
     setActiveSectionId(sectionId);
-  }, []);
+  }, [flushTypingHistory]);
 
   const loadDocument = useCallback((doc: SOPDocument) => {
+    flushTypingHistory();
     setDocument(doc);
     setActiveSectionId(doc.sections[0]?.id || '');
     setUndoStack([]);
     setRedoStack([]);
     setIsDirty(false);
     setCurrentScreen('workspace');
-  }, []);
+  }, [flushTypingHistory]);
 
   const loadSampleDocument = useCallback(() => {
     loadDocument(SAMPLE_LAB_SOP);
   }, [loadDocument]);
 
   const startNewDocumentFlow = useCallback(() => {
+    flushTypingHistory();
     setCurrentScreen('new-wizard');
-  }, []);
+  }, [flushTypingHistory]);
 
   const createNewDocument = useCallback((options: CreateDocumentOptions) => {
     const newDoc = createBlankDocument(options);
@@ -102,122 +142,77 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [loadDocument]);
 
   const saveDocument = useCallback(async () => {
+    flushTypingHistory();
     await documentStorage.save(document);
     setIsDirty(false);
     setLastSavedAt(new Date().toLocaleTimeString());
-  }, [document]);
+  }, [document, flushTypingHistory]);
 
   const updateMetadata = useCallback((patch: Partial<SOPMetadata>) => {
     setDocument(prev => {
-      pushHistory(prev);
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        metadata: {
-          ...prev.metadata,
-          ...patch
-        }
-      };
+      pushImmediateHistory(prev);
+      return updateDocumentMetadata(prev, patch);
     });
-  }, [pushHistory]);
+  }, [pushImmediateHistory]);
 
   const updateBranding = useCallback((patch: Partial<BrandingSettings>) => {
     setDocument(prev => {
-      pushHistory(prev);
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        branding: {
-          ...prev.branding,
-          ...patch
-        }
-      };
+      pushImmediateHistory(prev);
+      return updateDocumentBranding(prev, patch);
     });
-  }, [pushHistory]);
+  }, [pushImmediateHistory]);
 
   const updatePageSetup = useCallback((patch: Partial<PageSetup>) => {
     setDocument(prev => {
-      pushHistory(prev);
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        pageSetup: {
-          ...prev.pageSetup,
-          ...patch
-        }
-      };
+      pushImmediateHistory(prev);
+      return updateDocumentPageSetup(prev, patch);
     });
-  }, [pushHistory]);
+  }, [pushImmediateHistory]);
 
-  const updateSectionContent = useCallback((sectionId: string, content: string) => {
+  // Structured JSONContent update with typing history burst debouncing
+  const updateSectionContent = useCallback((sectionId: string, content: JSONContent) => {
     setDocument(prev => {
-      const idx = prev.sections.findIndex(s => s.id === sectionId);
-      if (idx === -1) return prev;
-      if (prev.sections[idx].content === content) return prev; // no change
+      // Capture the state prior to this burst of typing if not already captured
+      if (!typingBaselineDoc.current) {
+        typingBaselineDoc.current = prev;
+      }
 
-      pushHistory(prev);
-      const newSections = [...prev.sections];
-      newSections[idx] = {
-        ...newSections[idx],
-        content
-      };
+      // Reset debounce timer: if typing pauses for 1000ms, commit history milestone
+      if (typingDebounceTimer.current) {
+        window.clearTimeout(typingDebounceTimer.current);
+      }
+      typingDebounceTimer.current = window.setTimeout(() => {
+        flushTypingHistory();
+      }, 1000);
 
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        sections: newSections
-      };
+      setIsDirty(true);
+      return updateDocumentSectionContent(prev, sectionId, content);
     });
-  }, [pushHistory]);
+  }, [flushTypingHistory]);
 
   const updateSectionTitle = useCallback((sectionId: string, title: string) => {
     setDocument(prev => {
-      const idx = prev.sections.findIndex(s => s.id === sectionId);
-      if (idx === -1) return prev;
-      pushHistory(prev);
-
-      const newSections = [...prev.sections];
-      newSections[idx] = {
-        ...newSections[idx],
-        title
-      };
-
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        sections: newSections
-      };
+      pushImmediateHistory(prev);
+      return updateDocumentSectionTitle(prev, sectionId, title);
     });
-  }, [pushHistory]);
+  }, [pushImmediateHistory]);
 
   const setTemplateStyle = useCallback((styleId: TemplateStyleId) => {
     const style = TEMPLATE_STYLES[styleId];
     if (!style) return;
 
     setDocument(prev => {
-      pushHistory(prev);
-      return {
-        ...prev,
-        updatedAt: new Date().toISOString(),
-        style,
-        settings: {
-          ...prev.settings,
-          activeTemplateId: styleId
-        }
-      };
+      pushImmediateHistory(prev);
+      return updateDocumentStyle(prev, style);
     });
-  }, [pushHistory]);
+  }, [pushImmediateHistory]);
 
   const toggleSectionCollapse = useCallback((sectionId: string) => {
-    setDocument(prev => {
-      return {
-        ...prev,
-        sections: prev.sections.map(s => s.id === sectionId ? { ...s, collapsed: !s.collapsed } : s)
-      };
-    });
+    setDocument(prev => toggleDocumentSectionCollapse(prev, sectionId));
   }, []);
 
   const undo = useCallback(() => {
+    flushTypingHistory();
     if (undoStack.length === 0) return;
     isUndoRedoAction.current = true;
     const previous = undoStack[undoStack.length - 1];
@@ -228,9 +223,10 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
     setTimeout(() => {
       isUndoRedoAction.current = false;
     }, 50);
-  }, [undoStack, document]);
+  }, [undoStack, document, flushTypingHistory]);
 
   const redo = useCallback(() => {
+    flushTypingHistory();
     if (redoStack.length === 0) return;
     isUndoRedoAction.current = true;
     const next = redoStack[redoStack.length - 1];
@@ -241,11 +237,15 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
     setTimeout(() => {
       isUndoRedoAction.current = false;
     }, 50);
-  }, [redoStack, document]);
+  }, [redoStack, document, flushTypingHistory]);
 
-  // Initial local storage check
+  // Initial local storage check - seed demonstration sample silently if absent
   useEffect(() => {
-    documentStorage.save(SAMPLE_LAB_SOP).catch(() => {});
+    documentStorage.get(SAMPLE_LAB_SOP.id).then(stored => {
+      if (!stored) {
+        documentStorage.save(SAMPLE_LAB_SOP).catch(() => {});
+      }
+    });
   }, []);
 
   const value: DocumentContextType = {
@@ -254,7 +254,7 @@ export const DocumentProvider: React.FC<{ children: ReactNode }> = ({ children }
     viewMode,
     currentScreen,
     isDirty,
-    canUndo: undoStack.length > 0,
+    canUndo: undoStack.length > 0 || typingBaselineDoc.current !== null,
     canRedo: redoStack.length > 0,
     zoom,
     lastSavedAt,

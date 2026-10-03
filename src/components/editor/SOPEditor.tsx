@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -8,14 +8,18 @@ import {
   Heading1, Heading2, Heading3, 
   List, ListOrdered, 
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  CheckCircle2, AlertCircle, FileText
+  CheckCircle2, FileText
 } from 'lucide-react';
 import { useSOP } from '../../state/documentContext';
+import { findSection } from '../../operations/sectionOperations';
+import { createEmptyContent } from '../../models/content';
 
 export const SOPEditor: React.FC = () => {
   const { document: doc, activeSectionId, updateSectionContent, updateSectionTitle } = useSOP();
 
-  const activeSection = doc.sections.find(s => s.id === activeSectionId) || doc.sections[0];
+  const activeSection = findSection(doc.sections, activeSectionId) || doc.sections[0];
+  const activeSectionIdRef = useRef(activeSection?.id);
+  activeSectionIdRef.current = activeSection?.id;
 
   const editor = useEditor({
     extensions: [
@@ -24,34 +28,31 @@ export const SOPEditor: React.FC = () => {
           levels: [1, 2, 3]
         }
       }),
-      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph']
       })
     ],
-    content: activeSection ? activeSection.content : '',
+    content: activeSection ? activeSection.content : createEmptyContent(),
     editorProps: {
       attributes: {
         class: 'prose prose-slate max-w-none focus:outline-none min-h-[380px] p-6 text-slate-800 leading-relaxed font-sans'
       }
     },
     onUpdate: ({ editor }) => {
-      if (activeSection) {
-        const html = editor.getHTML();
-        updateSectionContent(activeSection.id, html);
+      const currentId = activeSectionIdRef.current;
+      if (currentId) {
+        const json = editor.getJSON();
+        updateSectionContent(currentId, json);
       }
     }
   });
 
-  // When active section changes, update editor content
+  // When active section changes, update editor with the new section's structured content
   useEffect(() => {
     if (editor && activeSection) {
-      const currentHtml = editor.getHTML();
-      if (currentHtml !== activeSection.content) {
-        editor.commands.setContent(activeSection.content, { emitUpdate: false });
-      }
+      editor.commands.setContent(activeSection.content || createEmptyContent(), { emitUpdate: false });
     }
-  }, [activeSectionId, editor]);
+  }, [activeSection?.id, editor]);
 
   if (!activeSection) {
     return (
@@ -263,7 +264,7 @@ export const SOPEditor: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>Client In-Memory Synchronization</span>
+          <span>Structured JSON Content</span>
         </div>
       </div>
     </div>
