@@ -1,6 +1,10 @@
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 
 /**
  * Authoritative shared Tiptap extension configuration.
@@ -13,6 +17,10 @@ import TextAlign from '@tiptap/extension-text-align';
  * - StarterKit (with headings 1-3, bold, italic, lists, paragraphs)
  * - Underline from @tiptap/extension-underline
  * - TextAlign from @tiptap/extension-text-align
+ * - Table from @tiptap/extension-table (resizable, structured AST node)
+ * - TableRow from @tiptap/extension-table-row
+ * - TableHeader from @tiptap/extension-table-header
+ * - TableCell from @tiptap/extension-table-cell
  */
 export const sharedEditorExtensions = [
   StarterKit.configure({
@@ -25,7 +33,16 @@ export const sharedEditorExtensions = [
   Underline,
   TextAlign.configure({
     types: ['heading', 'paragraph']
-  })
+  }),
+  Table.configure({
+    resizable: true,
+    HTMLAttributes: {
+      class: 'sop-table'
+    }
+  }),
+  TableRow,
+  TableHeader,
+  TableCell
 ];
 
 export default sharedEditorExtensions;

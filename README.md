@@ -119,9 +119,16 @@ npm test
 * **Validation Foundation**: Required field audits and completeness scoring.
 * **Test Suite**: Vitest suite covering document creation, structured AST content, nested section operations, templates, and validation.
 
+### Implemented in M1.1:
+* **Structured Tables**: First-class table support in canonical JSONContent and Tiptap editor:
+  - Resizable AST table nodes (`table`, `tableRow`, `tableHeader`, `tableCell`).
+  - Configurable row/column insertion with optional header row.
+  - Contextual editing toolbar: add/remove rows, add/remove columns, toggle header rows, merge/split cells, delete table.
+  - Data-driven table styling matching the 5 SOP visual styles (`bordered`, `striped`, `minimal`, `compliance`, `technical`).
+  - Full round-trip serialization and derived HTML rendering for print/preview.
+
 ### Deferred to Future Work Packages:
 * **IndexedDB Production Storage**: High-capacity client-side database (planned for production).
-* **Rich Data Tables**: Structured table editing inside procedure blocks.
 * **Callouts & Admonitions**: Standardized Note, Caution, and Warning callout components.
 * **Procedure-Step Blocks**: Discrete interactive step components with branching.
 * **Formulas & Equations**: LaTeX / MathML scientific formula rendering.

@@ -172,7 +172,7 @@ export const SOPPreview: React.FC = () => {
 
                   {/* Content Rendered from Canonical JSONContent */}
                   <div 
-                    className="prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed pl-1"
+                    className={`prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed pl-1 table-theme-${style.tableStyle || 'bordered'}`}
                     dangerouslySetInnerHTML={{ 
                       __html: html || '<p class="text-slate-400 italic">No content recorded for this section.</p>' 
                     }}

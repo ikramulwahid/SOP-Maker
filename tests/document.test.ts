@@ -423,4 +423,183 @@ describe('SOPStudio Canonical Document Model & Operations', () => {
       expect(result.warnings.some(w => w.field === 'reviewDate')).toBe(true);
     });
   });
+
+  describe('7. Structured Table Support (M1.1)', () => {
+    const labTableContent: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            {
+              type: 'tableRow',
+              content: [
+                {
+                  type: 'tableHeader',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Parameter' }] }]
+                },
+                {
+                  type: 'tableHeader',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Requirement' }] }]
+                },
+                {
+                  type: 'tableHeader',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Acceptance Criteria' }] }]
+                }
+              ]
+            },
+            {
+              type: 'tableRow',
+              content: [
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Temperature' }] }]
+                },
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: '20–25 °C' }] }]
+                },
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Within specified range' }] }]
+                }
+              ]
+            },
+            {
+              type: 'tableRow',
+              content: [
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'pH' }] }]
+                },
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: '6.8–7.2' }] }]
+                },
+                {
+                  type: 'tableCell',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Meets method requirement' }] }]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    it('authoritative sharedEditorExtensions includes Table, TableRow, TableHeader, TableCell', () => {
+      const names = sharedEditorExtensions.map(ext => ext.name);
+      expect(names).toContain('table');
+      expect(names).toContain('tableRow');
+      expect(names).toContain('tableHeader');
+      expect(names).toContain('tableCell');
+    });
+
+    it('represents structured laboratory table as JSONContent AST', () => {
+      expect(labTableContent.type).toBe('doc');
+      const tableNode = labTableContent.content![0];
+      expect(tableNode.type).toBe('table');
+      expect(tableNode.content).toHaveLength(3); // 1 header row + 2 data rows
+    });
+
+    it('table JSONContent survives full JSON serialization and deserialization intact', () => {
+      const doc = createBlankDocument({ title: 'SOP with Quality Control Table' });
+      doc.sections[8].content = labTableContent;
+
+      const serialized = documentStorage.exportToJSONString(doc);
+      const restored = documentStorage.importFromJSONString(serialized);
+
+      const restoredTable = restored.sections[8].content.content![0];
+      expect(restoredTable.type).toBe('table');
+      expect(restoredTable.content).toHaveLength(3);
+
+      // Verify header row
+      const headerRow = restoredTable.content![0];
+      expect(headerRow.type).toBe('tableRow');
+      expect(headerRow.content![0].type).toBe('tableHeader');
+      expect(headerRow.content![0].content![0].content![0].text).toBe('Parameter');
+      expect(headerRow.content![1].content![0].content![0].text).toBe('Requirement');
+      expect(headerRow.content![2].content![0].content![0].text).toBe('Acceptance Criteria');
+
+      // Verify data row
+      const dataRow1 = restoredTable.content![1];
+      expect(dataRow1.type).toBe('tableRow');
+      expect(dataRow1.content![0].type).toBe('tableCell');
+      expect(dataRow1.content![0].content![0].content![0].text).toBe('Temperature');
+      expect(dataRow1.content![1].content![0].content![0].text).toBe('20–25 °C');
+      expect(dataRow1.content![2].content![0].content![0].text).toBe('Within specified range');
+    });
+
+    it('contentToHTML() renders the structured table with table, tr, th, and td elements', () => {
+      const html = contentToHTML(labTableContent);
+      expect(html).toContain('<table');
+      expect(html).toContain('<th><p>Parameter</p></th>');
+      expect(html).toContain('<th><p>Requirement</p></th>');
+      expect(html).toContain('<th><p>Acceptance Criteria</p></th>');
+      expect(html).toContain('<td><p>Temperature</p></td>');
+      expect(html).toContain('<td><p>20–25 °C</p></td>');
+      expect(html).toContain('<td><p>Within specified range</p></td>');
+      expect(html).toContain('<td><p>pH</p></td>');
+      expect(html).toContain('<td><p>6.8–7.2</p></td>');
+    });
+
+    it('preserves table header cells (th) distinct from body cells (td)', () => {
+      const html = contentToHTML(labTableContent);
+      const thMatches = html.match(/<th/g) || [];
+      const tdMatches = html.match(/<td/g) || [];
+      expect(thMatches.length).toBe(3);
+      expect(tdMatches.length).toBe(6);
+    });
+
+    it('updating table in one section does not mutate other sections', () => {
+      const doc = createBlankDocument({ title: 'Section Isolation Test' });
+      const originalSection0 = doc.sections[0];
+      const originalSection1 = doc.sections[1];
+
+      const updatedDoc = updateDocumentSectionContent(doc, doc.sections[8].id, labTableContent);
+
+      expect(updatedDoc.sections[8].content).toBe(labTableContent);
+      expect(updatedDoc.sections[0]).toBe(originalSection0); // Reference equality
+      expect(updatedDoc.sections[1]).toBe(originalSection1); // Reference equality
+      expect(doc.sections[8].content).not.toBe(labTableContent); // Immutability
+    });
+
+    it('rich text marks (underline, bold, italic) continue to work inside table cells', () => {
+      const richTable: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'table',
+            content: [
+              {
+                type: 'tableRow',
+                content: [
+                  {
+                    type: 'tableCell',
+                    content: [
+                      {
+                        type: 'paragraph',
+                        content: [
+                          { type: 'text', text: 'Important: ', marks: [{ type: 'bold' }] },
+                          { type: 'text', text: 'must be calibrated', marks: [{ type: 'underline' }] },
+                          { type: 'text', text: ' prior to use (', marks: [] },
+                          { type: 'text', text: 'see SOP-002', marks: [{ type: 'italic' }] },
+                          { type: 'text', text: ').', marks: [] }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const html = contentToHTML(richTable);
+      expect(html).toContain('<strong>Important: </strong>');
+      expect(html).toContain('<u>must be calibrated</u>');
+      expect(html).toContain('<em>see SOP-002</em>');
+    });
+  });
 });

@@ -10,6 +10,126 @@
   }
 }
 
+/* Structured Table Styles (Editor & Derived HTML / Print) */
+.sop-table,
+.prose table,
+.tiptap table {
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  width: 100%;
+  table-layout: fixed;
+  overflow: hidden;
+  font-size: 0.8125rem;
+}
+
+.sop-table th,
+.sop-table td,
+.prose table th,
+.prose table td,
+.tiptap table th,
+.tiptap table td {
+  min-width: 2rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.5rem 0.625rem;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.sop-table th,
+.prose table th,
+.tiptap table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+.sop-table p,
+.prose table p,
+.tiptap table p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Cell selection highlight in editor */
+.tiptap .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(59, 130, 246, 0.18);
+  pointer-events: none;
+}
+
+/* Tiptap column resize handle */
+.tiptap .column-resize-handle {
+  bottom: -2px;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+  background-color: #2563eb;
+  pointer-events: none;
+}
+
+/* Style-aware table themes */
+.table-theme-bordered th {
+  background-color: #eff6ff;
+  border-bottom: 2px solid #2563eb;
+  color: #1e3a8a;
+}
+.table-theme-bordered td, .table-theme-bordered th {
+  border-color: #bfdbfe;
+}
+
+.table-theme-striped th {
+  background-color: #0f172a;
+  color: #ffffff;
+  border-color: #334155;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.table-theme-striped tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+.table-theme-striped td {
+  border-color: #cbd5e1;
+}
+
+.table-theme-minimal th,
+.table-theme-minimal td {
+  border-left: none !important;
+  border-right: none !important;
+  border-color: #e2e8f0;
+}
+.table-theme-minimal th {
+  background-color: transparent;
+  border-bottom: 2px solid #64748b;
+  color: #334155;
+}
+
+.table-theme-compliance th {
+  background-color: #ecfdf5;
+  border-bottom: 2px solid #059669;
+  color: #065f46;
+}
+.table-theme-compliance td, .table-theme-compliance th {
+  border-color: #a7f3d0;
+}
+
+.table-theme-technical th {
+  background-color: #f0f9ff;
+  border-bottom: 2px solid #0284c7;
+  color: #0369a1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+}
+.table-theme-technical td, .table-theme-technical th {
+  border-color: #bae6fd;
+}
+
 /* Print Styles for A4 Paper Output */
 @media print {
   body {

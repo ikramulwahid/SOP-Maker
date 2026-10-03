@@ -131,7 +131,13 @@ export interface DocumentStorage {
 * Continuous A4 browser print/PDF prototype.
 * Automated Vitest unit test suite.
 
+### Implemented in M1.1:
+* **Structured Tables**: Native Tiptap AST table extensions (`Table`, `TableRow`, `TableHeader`, `TableCell`) integrated into `sharedEditorExtensions`.
+* Configurable table insertion (custom rows, columns, header toggle) and contextual table editing toolbar (row/column add/remove, merge/split cells, header toggle, delete table).
+* Data-driven table styling mapped to the 5 SOP visual styles (`bordered`, `striped`, `minimal`, `compliance`, `technical`).
+* Unit tests verifying AST representation, header preservation, round-trip serialization, and section isolation.
+
 ### Deferred Work Packages:
-* **M1**: Rich data tables, Callout admonitions (Note/Caution/Warning), Step-by-Step procedure step blocks, and Native `.docx` exporter.
+* **M1 (Remaining)**: Callout admonitions (Note/Caution/Warning), Step-by-Step procedure step blocks, and Native `.docx` exporter.
 * **M2**: IndexedDB production storage, Standalone Vector PDF renderer, `.docx` document importer, and section drag-and-drop reordering.
 * **M3**: Optional AI Assistant (Gemini) for procedural clarity reviews, safety gap checks, and section suggestions (strictly operator-reviewed; no automatic parameter invention).
