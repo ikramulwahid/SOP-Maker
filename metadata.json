@@ -1,0 +1,6 @@
+{
+  "name": "SOPStudio",
+  "description": "Professional laboratory and technical Standard Operating Procedure (SOP) authoring, formatting, and document management platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
